@@ -8,6 +8,9 @@ local KeystoneTooltip = CreateFrame("GameTooltip", "GuildKeystone-Tooltip", UIPa
 local hiddenTip
 local currentTip = nil
 
+local LOOT_SELF_REGEX = gsub(LOOT_ITEM_SELF, "%%s", "(.+)")
+local LOOT_REGEX = gsub(LOOT_ITEM, "%%s", "(.+)")
+
 -- Recusion is kind of silly here but it should be super rare (like development only) rare to find more than one person ever anyway.
 local function RemovePlayerFromDatastore(player)
     local stones = GuildKeystone_Datastore.keystones
@@ -137,8 +140,6 @@ local OnMove = function(tip)
 end
 
 KeystoneTooltip:SetScript("OnEvent", function(self, event, prefix, ...)
-        print('dis', ...)
-        print(event, prefix)
         if event == 'CHAT_MSG_ADDON' then
             local message, channel, sender = ...
             if prefix == PREFIX then
@@ -181,6 +182,22 @@ KeystoneTooltip:SetScript("OnEvent", function(self, event, prefix, ...)
             end
         elseif event == 'CHAT_MSG_LOOT' then
             message, sender, language, channelString, target, flags, unknown, channelNumber, channelName, unknown, counter = ...
+            print(message)
+            print(prefix)
+            print(...)
+            local _, _, sPlayer, itemlink = string.find(lootmsg, LOOT_REGEX)
+            if not sPlayer then _, _, itemlink = string.find(lootmsg, LOOT_SELF_REGEX) end
+            if not itemlink then self:debug("No item link") return end
+            local _, _, itemId = string.find(itemlink, "item:(%d+):")
+            print(itemId)
+            if itemId == keystoneID then
+                --do something
+                print("PLAYER LOOTED A KEYSTONE!", sPlayer, itemlink)
+
+                if not sPlayer then
+                    commandLine()
+                end
+            end
         end
 
     end)
