@@ -1,5 +1,6 @@
 local keystoneID = 138019;
 local PREFIX = "GUILDKEYSTONE"
+local SYNC_MESSAGE = "SYNCHRONIZE"
 local GREEN = {r=.25, g=.25, b=.75}
 local YELLOW = {r=1, g=0, b=.82}
 local RED = {r=1, g=.1, b=.1}
@@ -54,24 +55,16 @@ local function getKeystoneValues(item)
     return zone, level
 end
 
-SLASH_GUILDKEYSTONE_TEST1 = '/gk';
-local function commandLine(msg, editbox)
-    local zone,level
-    for bag = 0,4 do
-        for slot = 1,GetContainerNumSlots(bag) do
-            local _, _, _, _, _, _, link, _, _, itemid = GetContainerItemInfo(bag, slot);
-            if itemid == keystoneID then
-                print(link);
-                zone, level = getKeystoneValues(link);
-                break
-            end
-        end
-    end
-    if zone and level then
-        SendAddonMessage(PREFIX, zone..'#'..level, 'GUILD')
-    end
+local function ResetDatastore()
+    GuildKeystone_Datastore.keystones = {}
 end
-SlashCmdList["GUILDKEYSTONE_TEST"] = commandLine;
+
+SLASH_GUILDKEYSTONE_TEST1 = '/gk';
+local function CommandLine(msg, editbox)
+    if msg == 'reset' then ResetDatastore(); return end
+    SendAddonMessage(PREFIX, SYNC_MESSAGE, 'GUILD')
+end
+SlashCmdList["GUILDKEYSTONE_TEST"] = CommandLine;
 
 
 local function InitDatastore()
@@ -120,7 +113,7 @@ local OnTooltip = function(tip)
     end
 
     KeystoneTooltip:Show()
-    KeystoneTooltip:SetAnchorType(ANCHOR_LEFT, 0, -KeystoneTooltip:GetHeight())
+    KeystoneTooltip:SetAnchorType("ANCHOR_LEFT", 0, -KeystoneTooltip:GetHeight())
 end
 
 local OnHide = function(tip)
@@ -132,18 +125,39 @@ local OnHide = function(tip)
 end
 
 local OnFade = function(tip)
-    print("we fadin fast")
+
 end
 
 local OnMove = function(tip)
-    print("we move swiftly")
+
 end
 
-KeystoneTooltip:SetScript("OnEvent", function(self, event, prefix, ...)
+local function Synchronize()
+    local zone,level
+    for bag = 0,4 do
+        for slot = 1,GetContainerNumSlots(bag) do
+            local _, _, _, _, _, _, link, _, _, itemid = GetContainerItemInfo(bag, slot);
+            if itemid == keystoneID then
+                print(link);
+                zone, level = getKeystoneValues(link);
+                break
+            end
+        end
+    end
+    if zone and level then
+        SendAddonMessage(PREFIX, zone..'#'..level, 'GUILD')
+    end
+end
+
+KeystoneTooltip:SetScript("OnEvent", function(self, event, ...)
         if event == 'CHAT_MSG_ADDON' then
-            local message, channel, sender = ...
+            local prefix, message, channel, sender = ...
             if prefix == PREFIX then
                 print(prefix..' '..message..' '..channel..' '..sender)
+                if message == SYNC_MESSAGE then 
+                    Synchronize()
+                    return
+                end
                 instance, level = string.match(message, '(.*)#(.*)')
                 RemovePlayerFromDatastore(sender)
                 local stones = GuildKeystone_Datastore.keystones
@@ -157,6 +171,7 @@ KeystoneTooltip:SetScript("OnEvent", function(self, event, prefix, ...)
                 GuildKeystone_Datastore.LastUpdate = date()
             end
         elseif event == 'ADDON_LOADED' then
+            local addonName = ...
             KeystoneTooltip:UnregisterEvent("ADDON_LOADED")
             
             for _, tooltip in pairs({ GameTooltip, ItemRefTooltip }) do
@@ -166,7 +181,7 @@ KeystoneTooltip:SetScript("OnEvent", function(self, event, prefix, ...)
                 hooksecurefunc(tooltip, "FadeOut", OnFade)
                 tooltip:HookScript("OnDragStop", OnMove)
             end
-            if prefix == 'GuildKeystone' then
+            if addonName == 'GuildKeystone' then
                 if GuildKeystone_Datastore == nil then
                     InitDatastore()
                 end
@@ -178,31 +193,33 @@ KeystoneTooltip:SetScript("OnEvent", function(self, event, prefix, ...)
                         end
                     end
                 end
-                commandLine()
+                Synchronize()
             end
         elseif event == 'CHAT_MSG_LOOT' then
             message, sender, language, channelString, target, flags, unknown, channelNumber, channelName, unknown, counter = ...
-            print(message)
-            print(prefix)
-            print(...)
+            -- print(...)
             local _, _, sPlayer, itemlink = string.find(lootmsg, LOOT_REGEX)
             if not sPlayer then _, _, itemlink = string.find(lootmsg, LOOT_SELF_REGEX) end
             if not itemlink then self:debug("No item link") return end
             local _, _, itemId = string.find(itemlink, "item:(%d+):")
-            print(itemId)
+            -- print(itemId)
             if itemId == keystoneID then
                 --do something
                 print("PLAYER LOOTED A KEYSTONE!", sPlayer, itemlink)
 
                 if not sPlayer then
-                    commandLine()
+                    Synchronize()
                 end
             end
+        elseif event == "GET_ITEM_INFO_RECEIVED" then
+            print("GET_ITEM_INFO: ", ...)
+            itemid = ...
+            if itemid == keystoneID then Synchronize() end
         end
 
     end)
 
-
 KeystoneTooltip:RegisterEvent("CHAT_MSG_ADDON")
 KeystoneTooltip:RegisterEvent("ADDON_LOADED")
 KeystoneTooltip:RegisterEvent("CHAT_MSG_LOOT")
+KeystoneTooltip:RegisterEvent("GET_ITEM_INFO_RECEIVED")
