@@ -14,6 +14,10 @@ local LOOT_REGEX = gsub(LOOT_ITEM, "%%s", "(.+)")
 local ITEM_SELF_REGEX = gsub(LOOT_ITEM_PUSHED_SELF, "%%s", "(.+)")
 local ITEM_REGEX = gsub(LOOT_ITEM_PUSHED, "%%s", "(.+)")
 
+local function Synchronize()
+    SendAddonMessage(PREFIX, SYNC_MESSAGE, 'GUILD')
+end
+
 -- Recusion is kind of silly here but it should be super rare (like development only) rare to find more than one person ever anyway.
 local function RemovePlayerFromDatastore(player)
     local stones = GuildKeystone_Datastore.keystones
@@ -64,7 +68,7 @@ end
 SLASH_GUILDKEYSTONE_TEST1 = '/gk';
 local function CommandLine(msg, editbox)
     if msg == 'reset' then ResetDatastore(); return end
-    SendAddonMessage(PREFIX, SYNC_MESSAGE, 'GUILD')
+    Synchronize()
 end
 SlashCmdList["GUILDKEYSTONE_TEST"] = CommandLine;
 
@@ -134,13 +138,12 @@ local OnMove = function(tip)
 
 end
 
-local function Synchronize()
+local function SendKeystone()
     local zone,level
     for bag = 0,4 do
         for slot = 1,GetContainerNumSlots(bag) do
             local _, _, _, _, _, _, link, _, _, itemid = GetContainerItemInfo(bag, slot);
             if itemid == keystoneID then
-                print(link);
                 zone, level = getKeystoneValues(link);
                 break
             end
@@ -151,13 +154,18 @@ local function Synchronize()
     end
 end
 
+
 KeystoneTooltip:SetScript("OnEvent", function(self, event, ...)
         if event == 'CHAT_MSG_ADDON' then
             local prefix, message, channel, sender = ...
             if prefix == PREFIX then
                 print(prefix..' '..message..' '..channel..' '..sender)
+                local noServerName = string.match(sender, '(.+)-.+')
+                if noServerName ~= nil then
+                    sender = noServerName
+                end
                 if message == SYNC_MESSAGE then 
-                    Synchronize()
+                    SendKeystone()
                     return
                 end
                 instance, level = string.match(message, '(.*)#(.*)')
@@ -173,6 +181,7 @@ KeystoneTooltip:SetScript("OnEvent", function(self, event, ...)
                 GuildKeystone_Datastore.LastUpdate = date()
             end
         elseif event == 'ADDON_LOADED' then
+            print(...)
             local addonName = ...
             KeystoneTooltip:UnregisterEvent("ADDON_LOADED")
             
@@ -184,19 +193,13 @@ KeystoneTooltip:SetScript("OnEvent", function(self, event, ...)
                 tooltip:HookScript("OnDragStop", OnMove)
             end
             if addonName == 'GuildKeystone' then
+                print("GuildKeystone loaded")
                 if GuildKeystone_Datastore == nil then
                     InitDatastore()
                 end
-                local stones = GuildKeystone_Datastore.keystones
-                for k, _ in pairs(stones) do
-                    for k2, _ in pairs(stones[k]) do
-                        for _, v in pairs(stones[k][k2]) do
-                            print(k, k2, v)
-                        end
-                    end
-                end
-                Synchronize()
             end
+        elseif event == 'PLAYER_LOGIN' then
+            Synchronize()
         elseif event == 'CHAT_MSG_LOOT' then
             message, sender, language, channelString, target, flags, unknown, channelNumber, channelName, unknown, counter = ...
             local sPlayer, itemlink = string.match(message, LOOT_REGEX)
@@ -210,13 +213,13 @@ KeystoneTooltip:SetScript("OnEvent", function(self, event, ...)
                 print("PLAYER LOOTED A KEYSTONE!", sPlayer, itemlink)
 
                 if not sPlayer then
-                    Synchronize()
+                    SendKeystone()
                 end
             end
         elseif event == "GET_ITEM_INFO_RECEIVED" then
             itemid = ...
             if itemid == keystoneID then
-                Synchronize()
+                SendKeystone()
                 print("Got item info about a Keystone!")
             end
         end
@@ -227,3 +230,4 @@ KeystoneTooltip:RegisterEvent("CHAT_MSG_ADDON")
 KeystoneTooltip:RegisterEvent("ADDON_LOADED")
 KeystoneTooltip:RegisterEvent("CHAT_MSG_LOOT")
 KeystoneTooltip:RegisterEvent("GET_ITEM_INFO_RECEIVED")
+KeystoneTooltip:RegisterEvent("PLAYER_LOGIN")
