@@ -1,4 +1,4 @@
-## Interface: 70000
+## Interface: 70100
 ## Title: GuildKeystone
 ## Author: BoinKlasik
 ## Version: 0.1

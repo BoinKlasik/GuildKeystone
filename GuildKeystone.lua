@@ -262,12 +262,11 @@ KeystoneTooltip:SetScript("OnEvent", function(self, event, ...)
             if not sPlayer then sPlayer, itemlink = string.match(message, ITEM_REGEX) end 
             if not sPlayer then itemlink = string.match(message, LOOT_SELF_REGEX) end
             if not itemlink then itemlink = string.match(message, ITEM_SELF_REGEX) end
-            if not itemlink then print("No item link") return end
+            -- if not itemlink then print("No item link") return end
             local itemId = string.match(itemlink, "item:(%d+):")
             itemId = tonumber(itemId) or 0
             if itemId == keystoneID then
-                --do something
-                print("PLAYER LOOTED A KEYSTONE!", sPlayer, itemlink)
+                -- print("PLAYER LOOTED A KEYSTONE!", sPlayer, itemlink)
 
                 if not sPlayer then
                     SendKeystone()
@@ -279,6 +278,8 @@ KeystoneTooltip:SetScript("OnEvent", function(self, event, ...)
                 SendKeystone()
                 print("Got item info about a Keystone!")
             end
+        elseif event == "CHALLENGE_MODE_COMPLETED" then
+            SendKeystone()
         end
 
     end)
@@ -288,3 +289,5 @@ KeystoneTooltip:RegisterEvent("ADDON_LOADED")
 KeystoneTooltip:RegisterEvent("CHAT_MSG_LOOT")
 KeystoneTooltip:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 KeystoneTooltip:RegisterEvent("PLAYER_LOGIN")
+KeystoneTooltip:RegisterEvent("CHALLENGE_MODE_COMPLETED")
+KeystoneTooltip:RegisterEvent("CHALLENGE_MODE_END")
